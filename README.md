@@ -1,1 +1,2 @@
 # Daily-Learning-Routine-for-Programming-Internship
+I took the course "Programming Internship" in the second semester of my freshman year. This repository is used to document some of the code, projects, notes, and more from my learning process, aiming to share, exchange ideas, and keep records. If there are any shortcomings, please feel free to offer your insights and suggestions. I would like to express my gratitude to my professor, Ms. Liu Jiaying, my teaching assistant, Mr. Sun Yifan, and the classmates who studied with me for their gracious assistance and support.
