@@ -1016,3 +1016,574 @@ int main() {
 - 必须遵守基本规则（不能改变优先级、操作数个数等）。
 - 常用运算符重载包括算术、赋值、关系、下标、函数调用、类型转换等。
 - 注意自赋值、常量正确性和返回类型的选择。
+
+
+### 继承, 基类, 派生类
+
+#### 继承方式与访问控制
+
+继承方式决定了基类成员在派生类中的访问级别：
+
+基类成员访问权限	    public 继承	            protected 继承	            private 继承
+    public	        派生类中为 public	    派生类中为 protected	    派生类中为 private
+    protected	    派生类中为 protected	派生类中为 protected	    派生类中为 private
+    private	        派生类中不可访问	        派生类中不可访问	        派生类中不可访问
+
+public 继承：最常用，保持基类的访问权限。派生类对象可以访问基类的 public 成员。
+protected 继承：基类的 public 和 protected 成员在派生类中变为 protected，派生类对象不能直接访问，但派生类的派生类可以。
+private 继承：基类的所有成员在派生类中变为 private，常用于实现细节（通常用组合替代）。
+
+
+补充：protected的作用：
+三种访问控制的作用
+修饰符	    类内访问	    派生类内访问	    类外（通过对象）访问
+public	    ✔️ 可以	           ✔️ 可以	            ✔️ 可以
+protected	✔️ 可以	            ✔️ 可以	             ❌ 不可以
+private	    ✔️ 可以	            ❌ 不可以	        ❌ 不可以
+类内：指类的成员函数（包括友元函数）中。
+派生类内：指派生类的成员函数（包括友元函数）中。
+类外：指通过对象名（或指针/引用）在非成员函数中访问。
+
+
+#### 派生类的构造函数
+
+在 C++ 中，派生类对象在创建时，不仅需要初始化自己新增的成员，还需要先初始化基类部分。派生类的构造函数负责协调这一过程：它必须调用基类的构造函数来初始化继承自基类的成员，然后才能初始化自己的成员。下面详细讲解派生类构造函数的规则、用法和注意事项。
+
+##### 一、派生类构造函数的语法
+
+派生类构造函数的定义与普通类类似，但可以使用初始化列表来显式调用基类的构造函数。
+
+```cpp
+class 派生类名 : 继承方式 基类名 {
+public:
+    派生类名(参数列表) : 基类名(基类参数列表), 派生类成员初始化列表 {
+        // 构造函数体
+    }
+};
+```
+- 如果基类有默认构造函数（无参或全缺省参数），可以省略对基类构造函数的显式调用，编译器会自动调用基类的默认构造函数。
+- 如果基类没有默认构造函数，则派生类构造函数必须在初始化列表中显式调用基类的某个构造函数。
+
+##### 二、构造函数的执行顺序
+
+当创建派生类对象时，构造函数的执行顺序是严格确定的：
+
+- 先调用基类的构造函数（按照继承顺序，多继承时按声明顺序）。
+- 然后初始化派生类中的成员对象（按它们在类中声明的顺序，而不是初始化列表的顺序）。
+- 最后执行派生类构造函数体。
+**析构函数的执行顺序恰好相反：**先执行派生类析构函数体，然后析构成员对象，最后调用基类析构函数。
+
+示例：
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    Base() { cout << "Base 默认构造\n"; }
+    Base(int x) { cout << "Base 带参构造: " << x << endl; }
+};
+
+class Member {
+public:
+    Member() { cout << "Member 默认构造\n"; }
+    Member(int y) { cout << "Member 带参构造: " << y << endl; }
+};
+
+class Derived : public Base {
+    Member m;
+public:
+    // 显式调用基类带参构造函数，并用初始化列表初始化成员 m
+    Derived(int a, int b) : Base(a), m(b) {
+        cout << "Derived 构造函数体\n";
+    }
+};
+
+int main() {
+    Derived d(10, 20);
+    return 0;
+}
+```
+输出：
+
+```text
+Base 带参构造: 10
+Member 带参构造: 20
+Derived 构造函数体
+```
+可以看到，基类构造函数先执行，然后成员对象按声明顺序构造（这里 m 在 Derived 中声明在前），最后执行派生类构造函数体。
+
+##### 三、基类没有默认构造函数的情况
+
+如果基类没有默认构造函数（即没有无参构造函数或全缺省参数的构造函数），派生类必须在初始化列表中显式调用基类的某个构造函数。
+
+```cpp
+class Base {
+public:
+    Base(int x) { /* ... */ }   // 没有默认构造函数
+};
+
+class Derived : public Base {
+public:
+    Derived(int a) : Base(a) { } // 必须显式调用 Base 的构造函数
+    // 错误：Derived() : Base() { } // Base 没有默认构造函数
+};
+```
+如果省略，编译器会尝试调用基类的默认构造函数，但找不到就会报错。
+
+##### 四、多个基类（多重继承）时的构造函数
+
+当派生类有多个直接基类时，构造函数的执行顺序按照派生类声明中基类出现的顺序（从左到右），而不是初始化列表的顺序。
+
+```cpp
+class Base1 {
+public:
+    Base1(int x) { cout << "Base1\n"; }
+};
+class Base2 {
+public:
+    Base2(int y) { cout << "Base2\n"; }
+};
+
+class Derived : public Base1, public Base2 {
+public:
+    Derived(int a, int b) : Base2(b), Base1(a) {   // 先 Base1 后 Base2，与列表顺序无关
+        cout << "Derived\n";
+    }
+};
+
+int main() {
+    Derived d(1, 2);
+    return 0;
+}
+```
+输出：
+
+```text
+Base1
+Base2
+Derived
+```
+因为声明顺序是 Base1, Base2，所以即使初始化列表写成了 Base2(b), Base1(a)，实际执行仍先 Base1 后 Base2。
+
+##### 五、派生类的拷贝构造函数和移动构造函数
+
+派生类的拷贝构造函数需要显式调用基类的拷贝构造函数来复制基类部分，否则基类部分将被默认初始化（而不是拷贝）。
+
+```cpp
+class Base {
+public:
+    Base(const Base&) { cout << "Base copy\n"; }
+};
+
+class Derived : public Base {
+public:
+    // 正确：显式调用基类拷贝构造
+    Derived(const Derived& other) : Base(other) { }
+    // 错误：若不写 Base(other)，基类会调用默认构造函数
+};
+```
+
+同理，移动构造函数也要显式调用基类的移动构造函数（如果有）。建议遵循“三五法则”时一并处理。
+
+##### 六、虚继承时的构造函数
+
+在虚继承（解决菱形继承问题）中，虚基类的构造函数由最底层的派生类直接负责调用，而不是由中间类调用。因此，派生类的构造函数必须显式调用虚基类的构造函数（否则虚基类会调用默认构造函数）。
+
+```cpp
+class Grand {
+public:
+    Grand(int x) { cout << "Grand\n"; }
+};
+class Base1 : virtual public Grand {
+public:
+    Base1(int x) : Grand(x) { }   // 通常不会真正调用 Grand 的构造
+};
+class Base2 : virtual public Grand {
+public:
+    Base2(int x) : Grand(x) { }
+};
+class Derived : public Base1, public Base2 {
+public:
+    Derived(int x) : Grand(x), Base1(x), Base2(x) { }  // 必须调用 Grand
+};
+```
+创建 Derived 对象时，只会调用一次 Grand 的构造函数，由 Derived 的初始化列表决定。
+
+##### 七、基类与派生类的指针强制转换
+
+**基本概念**
+
+基类指针：类型是基类（如 Animal*），它可以指向基类对象，也可以指向派生类对象。
+派生类指针：类型是派生类（如 Dog*），通常只能指向派生类对象，不能直接指向基类对象（除非经过强制转换）。
+这种关系源于 “派生类是一种基类” 的原则（is-a 关系）。例如，Dog 是一种 Animal，所以 Dog* 可以隐式转换为 Animal*，反之则需要显式转换。
+
+**向上转换（Upcasting）**
+
+定义：将派生类指针（或引用）转换为基类指针（或引用）。
+
+安全性：绝对安全，因为派生类对象包含基类部分，指向派生类对象的基类指针可以安全地访问基类成员。
+转换方式：隐式转换，不需要强制转换。
+```cpp
+class Animal {
+public:
+    void eat() { cout << "Animal eating\n"; }
+};
+
+class Dog : public Animal {
+public:
+    void bark() { cout << "Dog barking\n"; }
+};
+
+int main() {
+    Dog dog;
+    Animal* pAnimal = &dog;   // 向上转换，隐式，安全
+    pAnimal->eat();           // 可以，调用基类方法
+    // pAnimal->bark();       // 错误！基类指针不能访问派生类新增成员
+    return 0;
+}
+```
+注意：通过基类指针只能访问基类中定义的成员（包括派生类重写的虚函数），不能访问派生类新增的成员。
+
+**向下转换（Downcasting）**
+
+定义：将基类指针（或引用）转换为派生类指针（或引用）。
+
+安全性：不一定安全。如果基类指针实际指向的是派生类对象，则转换后可以安全使用派生类成员；但如果基类指针指向的是基类对象，转换后访问派生类成员会引发未定义行为（程序崩溃或数据损坏）。
+转换方式：必须显式强制转换（static_cast、dynamic_cast 或 C 风格转换）。
+1. 不安全的向下转换（使用 static_cast）
+
+```cpp
+int main() {
+    Animal animal;
+    Dog* pDog = static_cast<Dog*>(&animal); // 危险！animal 不是 Dog
+    pDog->bark();   // 未定义行为！可能崩溃
+    return 0;
+}
+```
+2. 安全的向下转换（使用 dynamic_cast）
+
+如果基类包含虚函数（即具有多态性），可以使用 dynamic_cast 进行安全的向下转换。它在运行时检查类型信息，如果转换合法则返回转换后的指针，否则返回 nullptr（对于指针）或抛出异常（对于引用）。
+
+```cpp
+class Animal {
+public:
+    virtual void speak() {} // 虚函数，启用多态
+};
+class Dog : public Animal {
+public:
+    void bark() { cout << "Woof\n"; }
+};
+
+int main() {
+    Animal* pAnimal = new Dog();   // 实际指向 Dog
+    Dog* pDog = dynamic_cast<Dog*>(pAnimal);
+    if (pDog) {
+        pDog->bark();   // 安全：输出 Woof
+    } else {
+        cout << "转换失败\n";
+    }
+
+    Animal* pAnimal2 = new Animal();
+    Dog* pDog2 = dynamic_cast<Dog*>(pAnimal2);
+    if (pDog2) {
+        pDog2->bark();
+    } else {
+        cout << "转换失败\n";   // 输出此行
+    }
+    return 0;
+}
+```
+注意：dynamic_cast 要求基类至少有一个虚函数（即多态类型），否则无法进行运行时类型识别。
+
+四、static_cast 与 dynamic_cast 的区别
+
+特性	static_cast	dynamic_cast
+检查时机	编译时	运行时（需要虚函数）
+安全性	程序员负责保证正确性	自动检查，失败返回 nullptr（指针）或抛异常（引用）
+适用场景	已知类型关系安全时（如向上转换）	多态类型的安全向下转换
+效率	高（无运行时开销）	较低（需要运行时类型信息）
+向上转换推荐使用隐式转换或 static_cast。
+向下转换如果确定类型，可以用 static_cast 以提升效率；如果不确定，应使用 dynamic_cast 以保证安全。
+五、为什么向下转换危险？
+
+内存布局差异：派生类比基类包含更多成员。如果基类指针指向的是基类对象，用派生类指针去访问派生类独有的成员，会超出实际分配的内存范围，导致程序崩溃或数据损坏。
+多态保证：只有当基类指针实际指向派生类对象时，向下转换才有意义。
+六、示例：综合演示
+
+```cpp
+#include <iostream>
+#include <typeinfo>
+using namespace std;
+
+class Base {
+public:
+    virtual void print() { cout << "Base\n"; }
+    virtual ~Base() {}  // 虚析构，确保正确释放派生类对象
+};
+
+class Derived : public Base {
+public:
+    void print() override { cout << "Derived\n"; }
+    void derivedFunc() { cout << "Derived specific\n"; }
+};
+
+int main() {
+    Base* pBase = new Derived();  // 向上转换
+    pBase->print();               // 输出 Derived（多态）
+
+    // 向下转换
+    Derived* pDerived = dynamic_cast<Derived*>(pBase);
+    if (pDerived) {
+        pDerived->derivedFunc();  // 安全
+    }
+
+    Base* pBase2 = new Base();
+    Derived* pDerived2 = dynamic_cast<Derived*>(pBase2);
+    if (pDerived2) {
+        pDerived2->derivedFunc();
+    } else {
+        cout << "Cast failed\n";  // 输出此行
+    }
+
+    delete pBase;
+    delete pBase2;
+    return 0;
+}
+```
+输出：
+
+```text
+Derived
+Derived specific
+Cast failed
+```
+七、注意事项
+
+使用虚析构函数：如果基类指针指向派生类对象，并通过 delete 删除，基类析构函数应为虚函数，否则派生类部分不会被正确析构，造成资源泄漏。
+避免 C 风格强制转换：(Dog*)pAnimal 相当于 reinterpret_cast，完全不检查，极易出错。
+多态类型才能用 dynamic_cast：基类中至少有一个虚函数（或虚析构函数）。
+引用类型转换：dynamic_cast 用于引用时，如果转换失败会抛出 std::bad_cast 异常。
+计的核心。
+
+### 虚函数与多态
+
+虚函数是 C++ 实现运行时多态的核心机制。它允许你通过基类指针或引用调用派生类中重写的函数，从而实现“一个接口，多种实现”的效果。下面从基础到进阶，全面讲解虚函数的用法。
+
+#### 一、为什么需要虚函数？
+
+先看一个没有虚函数的例子：
+
+```cpp
+class Animal {
+public:
+    void speak() { cout << "Animal speaks\n"; }
+};
+
+class Dog : public Animal {
+public:
+    void speak() { cout << "Dog barks\n"; }
+};
+
+void makeSound(Animal& a) {
+    a.speak();   // 始终调用 Animal::speak()
+}
+
+int main() {
+    Dog d;
+    makeSound(d);  // 输出 "Animal speaks"，而不是 "Dog barks"
+}
+```
+虽然传入的是 Dog 对象，但 makeSound 中的 speak 调用的是基类的版本。这是因为没有使用虚函数，编译器在编译时根据参数类型（Animal&）决定调用哪个函数，即静态绑定。
+
+如果我们希望根据实际对象类型调用对应的函数，就需要将基类中的 speak 声明为虚函数，实现动态绑定。
+
+#### 二、虚函数的基本用法
+
+**1. 声明与重写**
+
+在基类中用 virtual 关键字声明虚函数，在派生类中用 override（C++11 起）重写。
+
+```cpp
+class Animal {
+public:
+    virtual void speak() { cout << "Animal speaks\n"; }
+    virtual ~Animal() {}   // 虚析构，稍后解释
+};
+
+class Dog : public Animal {
+public:
+    void speak() override { cout << "Dog barks\n"; }
+};
+```
+virtual：表示该函数可以被派生类重写，并启用动态绑定。
+override：C++11 引入，显式说明重写基类虚函数，如果基类没有对应的虚函数，编译器会报错，有助于发现错误。
+
+**2. 通过基类指针或引用调用**
+
+```cpp
+void makeSound(Animal& a) {
+    a.speak();   // 动态绑定：调用实际对象的 speak
+}
+
+int main() {
+    Dog d;
+    Animal& ref = d;
+    ref.speak();        // Dog barks
+
+    Animal* ptr = new Dog();
+    ptr->speak();       // Dog barks
+    delete ptr;
+}
+```
+关键：只有通过指针或引用调用虚函数时才会发生动态绑定。如果通过对象直接调用（如 d.speak()），则编译时就已确定调用 Dog::speak，但这并非多态的主要用途。
+
+#### 三、虚函数表（vtable）与动态绑定原理
+
+当类中有虚函数时，编译器会为该类生成一个虚函数表（vtable），其中存放了该类所有虚函数的地址。每个对象内部会隐含一个指向虚函数表的指针（vptr）。
+
+调用虚函数时，通过对象的 vptr 找到 vtable，再取出对应的函数地址并执行。
+派生类继承基类的 vtable，并替换重写过的虚函数地址。
+因此，动态绑定的代价是间接寻址，但开销很小。
+
+#### 四、纯虚函数与抽象类
+
+1. 纯虚函数
+
+如果基类中的某个虚函数没有实际意义，只是为了让派生类重写，可以将其声明为纯虚函数：
+
+```cpp
+class Shape {
+public:
+    virtual double area() const = 0;   // 纯虚函数
+};
+```
+语法：= 0 表示该函数没有实现，派生类必须重写它（否则派生类也会变成抽象类）。
+
+2. 抽象类
+
+包含至少一个纯虚函数的类称为抽象类。抽象类不能实例化对象，只能用作基类。
+
+```cpp
+Shape s;          // 错误：不能创建抽象类的对象
+Shape* ptr;   // 可以定义指针或引用
+```    
+3. 派生类实现纯虚函数
+
+派生类必须重写所有纯虚函数，才能成为具体类（可实例化）。
+
+```cpp
+class Circle : public Shape {
+    double r;
+public:
+    Circle(double radius) : r(radius) {}
+    double area() const override { return 3.14 * r * r; }
+};
+
+int main() {
+    Circle c(5);
+    Shape* p = &c;
+    cout << p->area();   // 输出 78.5
+}
+```
+#### 五、虚析构函数
+
+如果基类指针指向派生类对象，并且通过基类指针 delete 该对象，若基类析构函数不是虚函数，则只会调用基类的析构函数，导致派生类部分资源未释放，造成内存泄漏。
+
+解决：将基类的析构函数声明为虚函数。
+
+```cpp
+class Base {
+public:
+    virtual ~Base() { cout << "Base destructor\n"; }
+};
+
+class Derived : public Base {
+    int* data;
+public:
+    Derived() : data(new int[100]) {}
+    ~Derived() override { delete[] data; cout << "Derived destructor\n"; }
+};
+
+int main() {
+    Base* p = new Derived();
+    delete p;   // 先调用 Derived::~Derived，再调用 Base::~Base
+}
+```
+如果基类有虚函数，通常也应将析构函数设为虚函数（即使为空实现）。
+如果一个类不打算作为基类，则析构函数一般不设为虚函数，避免额外的 vptr 开销。
+六、虚函数在继承链中的行为
+
+访问权限：虚函数的访问权限（public、protected、private）在基类中决定，但派生类可以改变访问权限（不推荐）。
+返回值协变：如果基类虚函数返回基类指针/引用，派生类重写时可以返回派生类指针/引用（称为“协变返回类型”）。
+
+cpp
+class Base { virtual Base* clone() const; };
+class Derived : public Base { Derived* clone() const override; };
+默认参数：虚函数的默认参数在编译时根据调用者的静态类型决定，而不是动态类型。因此不要在虚函数中使用默认参数（或确保派生类与基类默认参数一致）。
+七、使用虚函数的注意事项
+
+构造函数不能是虚函数：因为构造时对象尚未完全构建，虚函数表还未建立。
+静态函数不能是虚函数：静态函数属于类，不属于对象。
+内联函数与虚函数：虚函数调用通常需要动态绑定，但编译器有时可以静态解析（如通过对象调用时），可能会内联。
+虚函数在模板中的使用：虚函数不能是模板函数（但类模板可以有虚函数）。
+性能考虑：虚函数调用比普通函数多一次间接寻址，但在大多数情况下可忽略。如果函数调用频繁且性能敏感，可考虑设计模式优化。
+八、综合示例
+
+cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+
+// 抽象基类
+class Shape {
+public:
+    virtual double area() const = 0;   // 纯虚函数
+    virtual void print() const { cout << "Shape\n"; }
+    virtual ~Shape() {}                // 虚析构
+};
+
+class Circle : public Shape {
+    double radius;
+public:
+    Circle(double r) : radius(r) {}
+    double area() const override { return 3.14159 * radius * radius; }
+    void print() const override { cout << "Circle, area = " << area() << "\n"; }
+};
+
+class Rectangle : public Shape {
+    double w, h;
+public:
+    Rectangle(double width, double height) : w(width), h(height) {}
+    double area() const override { return w * h; }
+    void print() const override { cout << "Rectangle, area = " << area() << "\n"; }
+};
+
+int main() {
+    vector<Shape*> shapes;
+    shapes.push_back(new Circle(5));
+    shapes.push_back(new Rectangle(4, 6));
+
+    for (auto s : shapes) {
+        s->print();          // 多态调用
+    }
+
+    // 释放内存
+    for (auto s : shapes) {
+        delete s;
+    }
+    return 0;
+}
+输出：
+
+text
+Circle, area = 78.5398
+Rectangle, area = 24
+九、总结
+
+虚函数：在基类中用 virtual 声明，派生类可重写，通过基类指针/引用调用时实现动态绑定。
+纯虚函数：= 0 的虚函数，使类成为抽象类，强制派生类实现接口。
+虚析构函数：确保通过基类指针删除派生类对象时，正确调用派生类析构函数。
+override：C++11 关键字，显式标记重写，提高代码安全性。
+掌握虚函数是理解面向对象多态的关键。练习时，可以尝试设计一个简单的图形绘制系统，或一个员工薪资管理系统，运用虚函数实现不同子类的特定行为。
